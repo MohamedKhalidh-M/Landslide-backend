@@ -50,28 +50,27 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
     try {
-        const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/landslide-system';
-        console.log(`Attempting to connect to MongoDB at ${mongoUri}...`);
+        const mongoUri = process.env.MONGO_URI;
 
-        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 2000 });
-        console.log('MongoDB Connected');
-    } catch (err) {
-        console.log('Local MongoDB connection failed, starting in-memory database...');
-        try {
-            const { MongoMemoryServer } = require('mongodb-memory-server');
-            const mongod = await MongoMemoryServer.create();
-            const uri = mongod.getUri();
-            console.log(`In-memory MongoDB started at ${uri}`);
-            await mongoose.connect(uri);
-            console.log('MongoDB Connected (In-Memory)');
-        } catch (memErr) {
-            console.error('Failed to start in-memory MongoDB:', memErr);
+        if (!mongoUri) {
+            console.error('ERROR: MONGO_URI environment variable is not set!');
+            console.error('Please set MONGO_URI to your MongoDB connection string.');
+            console.error('For Railway: Add MONGO_URI in your service variables');
+            console.error('For MongoDB Atlas: Get connection string from atlas.mongodb.com');
             process.exit(1);
         }
+
+        console.log('Connecting to MongoDB...');
+        await mongoose.connect(mongoUri);
+        console.log('✓ MongoDB Connected Successfully');
+
+    } catch (err) {
+        console.error('✗ MongoDB Connection Failed:', err.message);
+        process.exit(1);
     }
 
     server.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
+        console.log(`✓ Server running on port ${PORT}`);
     });
 };
 

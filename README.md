@@ -21,9 +21,15 @@ Cloud-based backend for an IoT Landslide Alert System that accepts real-time sen
 
 ## Quick Start
 
+### Local Development
+
 ```bash
 # Install dependencies
 npm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env and add your MongoDB connection string
 
 # Run unit tests
 node test/unit_test.js
@@ -31,6 +37,14 @@ node test/unit_test.js
 # Start server
 npm start
 ```
+
+### Production Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed Railway deployment instructions.
+
+**Required Environment Variable:**
+- `MONGO_URI`: MongoDB connection string (MongoDB Atlas recommended)
+
 
 ## API Endpoints
 

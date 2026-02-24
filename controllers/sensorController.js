@@ -14,7 +14,6 @@ exports.ingestData = async (req, res) => {
             .single();
 
         if (thresholdError || !thresholds) {
-            // Create default thresholds if none exist
             const { data: newThreshold, error: createError } = await supabase
                 .from('thresholds')
                 .insert({
@@ -29,7 +28,6 @@ exports.ingestData = async (req, res) => {
             thresholds = newThreshold;
         }
 
-        // Map snake_case DB columns to camelCase for riskAnalysis service
         const thresholdsMapped = {
             soilMoistureMax: thresholds.soil_moisture_max,
             rainfallMax: thresholds.rainfall_max,
@@ -65,7 +63,8 @@ exports.ingestData = async (req, res) => {
                 .from('alerts')
                 .insert({
                     risk_level: riskLevel,
-                    message: `High risk detected! Soil: ${soilMoisture}, Rain: ${rainfall}, Tilt: ${tiltValue}`,
+                    message: `High risk detected at ${sensorId}! Soil: ${soilMoisture}, Rain: ${rainfall}, Tilt: ${tiltValue}`,
+                    sensor_id: sensorId,
                     data_snapshot: newData
                 })
                 .select()
@@ -82,16 +81,48 @@ exports.ingestData = async (req, res) => {
     }
 };
 
+// Get all unique sensor node IDs
+exports.getNodes = async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('sensor_data')
+            .select('sensor_id');
+
+        if (error) throw error;
+
+        // Extract unique sensor IDs
+        const uniqueNodes = [...new Set(data.map(row => row.sensor_id))];
+        res.json(uniqueNodes);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server Error' });
+    }
+};
+
 exports.getRealTime = async (req, res) => {
     try {
-        const { data: latest, error } = await supabase
+        const { sensorId } = req.query;
+
+        let query = supabase
             .from('sensor_data')
             .select('*')
             .order('timestamp', { ascending: false })
             .limit(1)
             .single();
 
-        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows found
+        if (sensorId) {
+            query = supabase
+                .from('sensor_data')
+                .select('*')
+                .eq('sensor_id', sensorId)
+                .order('timestamp', { ascending: false })
+                .limit(1)
+                .single();
+        }
+
+        const { data: latest, error } = await query;
+
+        if (error && error.code !== 'PGRST116') throw error;
         res.json(latest || null);
     } catch (error) {
         console.error(error);
@@ -101,20 +132,26 @@ exports.getRealTime = async (req, res) => {
 
 exports.getHistory = async (req, res) => {
     try {
-        const { range } = req.query; // '24h', '7d'
+        const { range, sensorId } = req.query;
         let startDate = new Date();
 
         if (range === '7d') {
             startDate.setDate(startDate.getDate() - 7);
         } else {
-            startDate.setHours(startDate.getHours() - 24); // Default 24h
+            startDate.setHours(startDate.getHours() - 24);
         }
 
-        const { data, error } = await supabase
+        let query = supabase
             .from('sensor_data')
             .select('*')
             .gte('timestamp', startDate.toISOString())
             .order('timestamp', { ascending: true });
+
+        if (sensorId) {
+            query = query.eq('sensor_id', sensorId);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         res.json(data);

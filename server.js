@@ -30,6 +30,7 @@ app.get('/', (req, res) => {
 });
 
 app.post('/api/sensors', sensorController.ingestData);
+app.get('/api/sensors/nodes', sensorController.getNodes);
 app.get('/api/sensors/realtime', sensorController.getRealTime);
 app.get('/api/sensors/history', sensorController.getHistory);
 app.get('/api/alerts', alertController.getAlerts);

@@ -1,10 +1,17 @@
-const Alert = require('../models/Alert');
+const supabase = require('../config/supabase');
 
 exports.getAlerts = async (req, res) => {
     try {
-        const alerts = await Alert.find().sort({ timestamp: -1 }).limit(50); // Limit to last 50
+        const { data: alerts, error } = await supabase
+            .from('alerts')
+            .select('*')
+            .order('timestamp', { ascending: false })
+            .limit(50);
+
+        if (error) throw error;
         res.json(alerts);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Server Error' });
     }
 };

@@ -3,7 +3,7 @@ const { analyzeRisk } = require('../services/riskAnalysis');
 
 exports.ingestData = async (req, res) => {
     try {
-        const { sensorId, soilMoisture, rainfall, tiltValue, temperature, humidity } = req.body;
+        const { sensorId, location, soilMoisture, rainfall, tiltValue, temperature, humidity } = req.body;
 
         // Get latest thresholds
         let { data: thresholds, error: thresholdError } = await supabase
@@ -41,6 +41,7 @@ exports.ingestData = async (req, res) => {
             .from('sensor_data')
             .insert({
                 sensor_id: sensorId,
+                location: location || null,
                 soil_moisture: soilMoisture,
                 rainfall,
                 tilt_value: tiltValue,
@@ -63,7 +64,7 @@ exports.ingestData = async (req, res) => {
                 .from('alerts')
                 .insert({
                     risk_level: riskLevel,
-                    message: `High risk detected at ${sensorId}! Soil: ${soilMoisture}, Rain: ${rainfall}, Tilt: ${tiltValue}`,
+                    message: `High risk detected at ${sensorId} (${location || 'Unknown'})! Soil: ${soilMoisture}, Rain: ${rainfall}, Tilt: ${tiltValue}`,
                     sensor_id: sensorId,
                     data_snapshot: newData
                 })
@@ -81,18 +82,29 @@ exports.ingestData = async (req, res) => {
     }
 };
 
-// Get all unique sensor node IDs
+// Get all unique sensor nodes with their latest location
 exports.getNodes = async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('sensor_data')
-            .select('sensor_id');
+            .select('sensor_id, location, timestamp')
+            .order('timestamp', { ascending: false });
 
         if (error) throw error;
 
-        // Extract unique sensor IDs
-        const uniqueNodes = [...new Set(data.map(row => row.sensor_id))];
-        res.json(uniqueNodes);
+        // Get unique nodes with their latest location
+        const nodeMap = {};
+        for (const row of data) {
+            if (!nodeMap[row.sensor_id]) {
+                nodeMap[row.sensor_id] = {
+                    sensorId: row.sensor_id,
+                    location: row.location,
+                    lastSeen: row.timestamp
+                };
+            }
+        }
+
+        res.json(Object.values(nodeMap));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server Error' });
